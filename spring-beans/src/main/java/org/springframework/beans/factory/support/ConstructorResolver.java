@@ -102,8 +102,10 @@ class ConstructorResolver {
 		BeanWrapperImpl bw = new BeanWrapperImpl();
 		this.beanFactory.initBeanWrapper(bw);
 
+		// 构造函数
 		Constructor<?> constructorToUse = null;
 		ArgumentsHolder argsHolderToUse = null;
+		// 传入的参数
 		Object[] argsToUse = null;
 
 		if (explicitArgs != null) {
@@ -426,7 +428,7 @@ class ConstructorResolver {
 				}
 			}
 			// 获得所有符合条件的method
-			// 条件就是 1. 静态工厂方法是static，否则不是 2. 是工厂方法
+			// 条件就是 1. 如果是静态工厂方法只要static的，否则就只要非static的 2. 是工厂方法
 			if (candidates == null) {
 				candidates = new ArrayList<>();
 				Method[] rawCandidates = getCandidateMethods(factoryClass, mbd);
@@ -436,7 +438,7 @@ class ConstructorResolver {
 					}
 				}
 			}
-
+			// 只有一个方法且不需要传参，并且配置文件中也没有定义入参。
 			if (candidates.size() == 1 && explicitArgs == null && !mbd.hasConstructorArgumentValues()) {
 				Method uniqueCandidate = candidates.get(0);
 				if (uniqueCandidate.getParameterCount() == 0) {
@@ -450,16 +452,20 @@ class ConstructorResolver {
 					return bw;
 				}
 			}
-
+			// 先按public，非public排序，再按参数量降序
 			if (candidates.size() > 1) {  // explicitly skip immutable singletonList
 				candidates.sort(AutowireUtils.EXECUTABLE_COMPARATOR);
 			}
 
+			// 从配置文件中解析的参数
 			ConstructorArgumentValues resolvedValues = null;
+			// autowire=="constructor"
 			boolean autowiring = (mbd.getResolvedAutowireMode() == AutowireCapableBeanFactory.AUTOWIRE_CONSTRUCTOR);
+			// 类型差分数
 			int minTypeDiffWeight = Integer.MAX_VALUE;
+			// 类型差分并列最低的FactoryMethod们
 			Set<Method> ambiguousFactoryMethods = null;
-
+			// 配置文件中直接定义 或者 显式传参的数量
 			int minNrOfArgs;
 			if (explicitArgs != null) {
 				minNrOfArgs = explicitArgs.length;
@@ -498,6 +504,8 @@ class ConstructorResolver {
 							if (pnd != null) {
 								paramNames = pnd.getParameterNames(candidate);
 							}
+							// 根据配置文件中定义好的入参，工厂方法要求的参数，autowiring模式等获得所有参数。
+							// 如果autowiring不是constructor，那配置文件中的入参就得和方法要求的参数完全一致，否则就会报错
 							argsHolder = createArgumentArray(beanName, mbd, resolvedValues, bw,
 									paramTypes, paramNames, candidate, autowiring, candidates.size() == 1);
 						} catch (UnsatisfiedDependencyException ex) {
@@ -512,7 +520,7 @@ class ConstructorResolver {
 							continue;
 						}
 					}
-
+					// 获得当前方法的类型差异分
 					int typeDiffWeight = (mbd.isLenientConstructorResolution() ?
 							argsHolder.getTypeDifferenceWeight(paramTypes) : argsHolder.getAssignabilityWeight(paramTypes));
 					// Choose this factory method if it represents the closest match.
@@ -584,7 +592,7 @@ class ConstructorResolver {
 								"(hint: specify index/type/name arguments for simple parameters to avoid type ambiguities): " +
 								ambiguousFactoryMethods);
 			}
-
+			// 存缓存
 			if (explicitArgs == null && argsHolderToUse != null) {
 				mbd.factoryMethodToIntrospect = factoryMethodToUse;
 				argsHolderToUse.storeCache(mbd, factoryMethodToUse);
