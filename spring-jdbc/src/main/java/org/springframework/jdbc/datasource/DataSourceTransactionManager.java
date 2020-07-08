@@ -16,23 +16,18 @@
 
 package org.springframework.jdbc.datasource;
 
-import java.sql.Connection;
-import java.sql.SQLException;
-import java.sql.Statement;
-
-import javax.sql.DataSource;
-
 import org.springframework.beans.factory.InitializingBean;
 import org.springframework.lang.Nullable;
 import org.springframework.transaction.CannotCreateTransactionException;
 import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.TransactionSystemException;
-import org.springframework.transaction.support.AbstractPlatformTransactionManager;
-import org.springframework.transaction.support.DefaultTransactionStatus;
-import org.springframework.transaction.support.ResourceTransactionManager;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
-import org.springframework.transaction.support.TransactionSynchronizationUtils;
+import org.springframework.transaction.support.*;
 import org.springframework.util.Assert;
+
+import javax.sql.DataSource;
+import java.sql.Connection;
+import java.sql.SQLException;
+import java.sql.Statement;
 
 /**
  * {@link org.springframework.transaction.PlatformTransactionManager}
@@ -103,7 +98,6 @@ import org.springframework.util.Assert;
  * translation, aligned with {@link org.springframework.jdbc.core.JdbcTemplate}.</b>
  *
  * @author Juergen Hoeller
- * @since 02.05.2003
  * @see #setNestedTransactionAllowed
  * @see java.sql.Savepoint
  * @see DataSourceUtils#getConnection(javax.sql.DataSource)
@@ -112,6 +106,7 @@ import org.springframework.util.Assert;
  * @see TransactionAwareDataSourceProxy
  * @see LazyConnectionDataSourceProxy
  * @see org.springframework.jdbc.core.JdbcTemplate
+ * @since 02.05.2003
  */
 @SuppressWarnings("serial")
 public class DataSourceTransactionManager extends AbstractPlatformTransactionManager
@@ -126,6 +121,7 @@ public class DataSourceTransactionManager extends AbstractPlatformTransactionMan
 	/**
 	 * Create a new DataSourceTransactionManager instance.
 	 * A DataSource has to be set to be able to use it.
+	 *
 	 * @see #setDataSource
 	 */
 	public DataSourceTransactionManager() {
@@ -134,6 +130,7 @@ public class DataSourceTransactionManager extends AbstractPlatformTransactionMan
 
 	/**
 	 * Create a new DataSourceTransactionManager instance.
+	 *
 	 * @param dataSource the JDBC DataSource to manage transactions for
 	 */
 	public DataSourceTransactionManager(DataSource dataSource) {
@@ -158,6 +155,7 @@ public class DataSourceTransactionManager extends AbstractPlatformTransactionMan
 	 * <p><b>The DataSource passed in here needs to return independent Connections.</b>
 	 * The Connections may come from a pool (the typical case), but the DataSource
 	 * must not return thread-scoped / request-scoped Connections or the like.
+	 *
 	 * @see TransactionAwareDataSourceProxy
 	 * @see org.springframework.transaction.jta.JtaTransactionManager
 	 */
@@ -167,8 +165,7 @@ public class DataSourceTransactionManager extends AbstractPlatformTransactionMan
 			// for its underlying target DataSource, else data access code won't see
 			// properly exposed transactions (i.e. transactions for the target DataSource).
 			this.dataSource = ((TransactionAwareDataSourceProxy) dataSource).getTargetDataSource();
-		}
-		else {
+		} else {
 			this.dataSource = dataSource;
 		}
 	}
@@ -183,6 +180,7 @@ public class DataSourceTransactionManager extends AbstractPlatformTransactionMan
 
 	/**
 	 * Obtain the DataSource for actual use.
+	 *
 	 * @return the DataSource (never {@code null})
 	 * @throws IllegalStateException in case of no DataSource set
 	 * @since 5.0
@@ -208,8 +206,9 @@ public class DataSourceTransactionManager extends AbstractPlatformTransactionMan
 	 * <p>Note that older Oracle JDBC drivers (9i, 10g) used to enforce this read-only
 	 * mode even for {@code Connection.setReadOnly(true}. However, with recent drivers,
 	 * this strong enforcement needs to be applied explicitly, e.g. through this flag.
-	 * @since 4.3.7
+	 *
 	 * @see #prepareTransactionalConnection
+	 * @since 4.3.7
 	 */
 	public void setEnforceReadOnly(boolean enforceReadOnly) {
 		this.enforceReadOnly = enforceReadOnly;
@@ -218,8 +217,9 @@ public class DataSourceTransactionManager extends AbstractPlatformTransactionMan
 	/**
 	 * Return whether to enforce the read-only nature of a transaction
 	 * through an explicit statement on the transactional connection.
-	 * @since 4.3.7
+	 *
 	 * @see #setEnforceReadOnly
+	 * @since 4.3.7
 	 */
 	public boolean isEnforceReadOnly() {
 		return this.enforceReadOnly;
@@ -262,23 +262,24 @@ public class DataSourceTransactionManager extends AbstractPlatformTransactionMan
 		try {
 			if (!txObject.hasConnectionHolder() ||
 					txObject.getConnectionHolder().isSynchronizedWithTransaction()) {
+				// 获取新的连接，原生Connection
 				Connection newCon = obtainDataSource().getConnection();
 				if (logger.isDebugEnabled()) {
 					logger.debug("Acquired Connection [" + newCon + "] for JDBC transaction");
 				}
+				// 设置ConnectionHolder
 				txObject.setConnectionHolder(new ConnectionHolder(newCon), true);
 			}
 
 			txObject.getConnectionHolder().setSynchronizedWithTransaction(true);
 			con = txObject.getConnectionHolder().getConnection();
 
+			// 设置原生Connection的隔离级别
 			Integer previousIsolationLevel = DataSourceUtils.prepareConnectionForTransaction(con, definition);
 			txObject.setPreviousIsolationLevel(previousIsolationLevel);
 			txObject.setReadOnly(definition.isReadOnly());
 
-			// Switch to manual commit if necessary. This is very expensive in some JDBC drivers,
-			// so we don't want to do it unnecessarily (for example if we've explicitly
-			// configured the connection pool to set it already).
+			// 把原生Connection改为手动提交
 			if (con.getAutoCommit()) {
 				txObject.setMustRestoreAutoCommit(true);
 				if (logger.isDebugEnabled()) {
@@ -286,8 +287,9 @@ public class DataSourceTransactionManager extends AbstractPlatformTransactionMan
 				}
 				con.setAutoCommit(false);
 			}
-
+			// 如果需要的话，设置read-only
 			prepareTransactionalConnection(con, definition);
+			// 激活事务
 			txObject.getConnectionHolder().setTransactionActive(true);
 
 			int timeout = determineTimeout(definition);
@@ -295,13 +297,11 @@ public class DataSourceTransactionManager extends AbstractPlatformTransactionMan
 				txObject.getConnectionHolder().setTimeoutInSeconds(timeout);
 			}
 
-			// Bind the connection holder to the thread.
+			// 把ConnectionHolder绑定到当前线程
 			if (txObject.isNewConnectionHolder()) {
 				TransactionSynchronizationManager.bindResource(obtainDataSource(), txObject.getConnectionHolder());
 			}
-		}
-
-		catch (Throwable ex) {
+		} catch (Throwable ex) {
 			if (txObject.isNewConnectionHolder()) {
 				DataSourceUtils.releaseConnection(con, obtainDataSource());
 				txObject.setConnectionHolder(null, false);
@@ -331,8 +331,7 @@ public class DataSourceTransactionManager extends AbstractPlatformTransactionMan
 		}
 		try {
 			con.commit();
-		}
-		catch (SQLException ex) {
+		} catch (SQLException ex) {
 			throw translateException("JDBC commit", ex);
 		}
 	}
@@ -346,8 +345,7 @@ public class DataSourceTransactionManager extends AbstractPlatformTransactionMan
 		}
 		try {
 			con.rollback();
-		}
-		catch (SQLException ex) {
+		} catch (SQLException ex) {
 			throw translateException("JDBC rollback", ex);
 		}
 	}
@@ -379,8 +377,7 @@ public class DataSourceTransactionManager extends AbstractPlatformTransactionMan
 			}
 			DataSourceUtils.resetConnectionAfterTransaction(
 					con, txObject.getPreviousIsolationLevel(), txObject.isReadOnly());
-		}
-		catch (Throwable ex) {
+		} catch (Throwable ex) {
 			logger.debug("Could not reset JDBC Connection after transaction", ex);
 		}
 
@@ -403,11 +400,12 @@ public class DataSourceTransactionManager extends AbstractPlatformTransactionMan
 	 * <p>The "SET TRANSACTION READ ONLY" is understood by Oracle, MySQL and Postgres
 	 * and may work with other databases as well. If you'd like to adapt this treatment,
 	 * override this method accordingly.
-	 * @param con the transactional JDBC Connection
+	 *
+	 * @param con        the transactional JDBC Connection
 	 * @param definition the current transaction definition
 	 * @throws SQLException if thrown by JDBC API
-	 * @since 4.3.7
 	 * @see #setEnforceReadOnly
+	 * @since 4.3.7
 	 */
 	protected void prepareTransactionalConnection(Connection con, TransactionDefinition definition)
 			throws SQLException {
@@ -424,8 +422,9 @@ public class DataSourceTransactionManager extends AbstractPlatformTransactionMan
 	 * exception to propagate from the {@link #commit}/{@link #rollback} call.
 	 * <p>The default implementation throws a {@link TransactionSystemException}.
 	 * Subclasses may specifically identify concurrency failures etc.
+	 *
 	 * @param task the task description (commit or rollback)
-	 * @param ex the SQLException thrown from commit/rollback
+	 * @param ex   the SQLException thrown from commit/rollback
 	 * @return the translated exception to throw, either a
 	 * {@link org.springframework.dao.DataAccessException} or a
 	 * {@link org.springframework.transaction.TransactionException}

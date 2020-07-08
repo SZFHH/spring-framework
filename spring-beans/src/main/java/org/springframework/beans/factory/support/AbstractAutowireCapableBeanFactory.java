@@ -537,7 +537,7 @@ public abstract class AbstractAutowireCapableBeanFactory extends AbstractBeanFac
 		// Instantiate the bean.
 		BeanWrapper instanceWrapper = null;
 		if (mbd.isSingleton()) {
-			// 从没完成的factoryBean缓存中删掉
+			// 之前可能进行过typeCheckOnly的操作，在factoryBeanInstanceCache中留了一个未完成的factoryBean。
 			instanceWrapper = this.factoryBeanInstanceCache.remove(beanName);
 		}
 		if (instanceWrapper == null) {
