@@ -102,6 +102,8 @@ public abstract class FactoryBeanRegistrySupport extends DefaultSingletonBeanReg
 					object = doGetObjectFromFactoryBean(factory, beanName);
 					// Only post-process and store if not put there already during getObject() call above
 					// (e.g. because of circular reference processing triggered by custom getBean calls)
+					// 处理循环引用 FactoryBean的getObject内部调用getBean -> getBean的对象又包含
+					// FactoryBean的getObject的返回值，这样就会调用两次getObject。只保留其中一个。
 					Object alreadyThere = this.factoryBeanObjectCache.get(beanName);
 					if (alreadyThere != null) {
 						object = alreadyThere;
