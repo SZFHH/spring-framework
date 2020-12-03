@@ -900,6 +900,7 @@ public class RequestMappingHandlerAdapter extends AbstractHandlerMethodAdapter
 			Object bean = handlerMethod.getBean();
 			attrMethods.add(createModelAttributeMethod(binderFactory, bean, method));
 		}
+		// modelAttribute, initBinder, SessionAttribute
 		return new ModelFactory(attrMethods, binderFactory, sessionAttrHandler);
 	}
 

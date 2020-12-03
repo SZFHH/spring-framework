@@ -165,6 +165,7 @@ class ConstructorResolver {
 				minNrOfArgs = explicitArgs.length;
 			} else {
 				ConstructorArgumentValues cargs = mbd.getConstructorArgumentValues();
+				// 解析后的在xml定义的入参
 				resolvedValues = new ConstructorArgumentValues();
 				minNrOfArgs = resolveConstructorArguments(beanName, mbd, bw, cargs, resolvedValues);
 			}
@@ -699,6 +700,7 @@ class ConstructorResolver {
 			String paramName = (paramNames != null ? paramNames[paramIndex] : "");
 			// Try to find matching constructor argument value, either indexed or generic.
 			ConstructorArgumentValues.ValueHolder valueHolder = null;
+			// 对每个需要的入参，先在xml中传入的参数里面找
 			if (resolvedValues != null) {
 				valueHolder = resolvedValues.getArgumentValue(paramIndex, paramType, paramName, usedValueHolders);
 				// If we couldn't find a direct match and are not supposed to autowire,
@@ -708,6 +710,7 @@ class ConstructorResolver {
 					valueHolder = resolvedValues.getGenericArgumentValue(null, null, usedValueHolders);
 				}
 			}
+			// 如果在xml中传入的参数中找到了，就执行下面的代码
 			if (valueHolder != null) {
 				// We found a potential match - let's give it a try.
 				// Do not consider the same value definition multiple times!
@@ -738,6 +741,7 @@ class ConstructorResolver {
 				args.arguments[paramIndex] = convertedValue;
 				args.rawArguments[paramIndex] = originalValue;
 			} else {
+				// 如果没找到就尝试autowire，不能autowire就抛异常
 				MethodParameter methodParam = MethodParameter.forExecutable(executable, paramIndex);
 				// No explicit match found: we're either supposed to autowire or
 				// have to fail creating an argument array for the given constructor.
